@@ -55,7 +55,7 @@ public class RepoViewPerspectiveListener implements IPerspectiveListener, IPersp
      */
     @Override
     public void perspectivePreDeactivate(IWorkbenchPage page, IPerspectiveDescriptor perspective) {
-
+        //
     }
 
     /*
@@ -66,7 +66,7 @@ public class RepoViewPerspectiveListener implements IPerspectiveListener, IPersp
      */
     @Override
     public void perspectiveOpened(IWorkbenchPage page, IPerspectiveDescriptor perspective) {
-
+        //
     }
 
     /*
@@ -88,7 +88,7 @@ public class RepoViewPerspectiveListener implements IPerspectiveListener, IPersp
      */
     @Override
     public void perspectiveDeactivated(IWorkbenchPage page, IPerspectiveDescriptor perspective) {
-
+        //
     }
 
     /*
@@ -100,7 +100,7 @@ public class RepoViewPerspectiveListener implements IPerspectiveListener, IPersp
     @Override
     public void perspectiveSavedAs(IWorkbenchPage page, IPerspectiveDescriptor oldPerspective,
             IPerspectiveDescriptor newPerspective) {
-
+        //
     }
 
     /*
@@ -111,15 +111,7 @@ public class RepoViewPerspectiveListener implements IPerspectiveListener, IPersp
      */
     @Override
     public void perspectiveActivated(IWorkbenchPage page, IPerspectiveDescriptor perspective) {
-        final CommonViewer commonViewer2 = getCommonViewer();
-
-        if (commonViewer2 instanceof RepoViewCommonViewer) {
-            RepositoryNodeFilterHelper.filter(commonViewer2, RepositoryNodeFilterHelper.isActivedFilter(),
-                    PerspectiveFilterHelper.isActivedPerspectiveFilter());
-
-            ((RepoViewCommonViewer) commonViewer2).fireRefreshNodePerspectiveLisenter();
-        }
-
+        doPerspectiveFilter(); // when switch the perspecitve. or open new one too.
     }
 
     /*
@@ -142,13 +134,27 @@ public class RepoViewPerspectiveListener implements IPerspectiveListener, IPersp
     @Override
     public void perspectiveChanged(IWorkbenchPage page, IPerspectiveDescriptor perspective, IWorkbenchPartReference partRef,
             String changeId) {
+        // after open studio
+        if (partRef.getId().equals(getCommonViewer().getNavigatorContentService().getViewerId())
+                && IWorkbenchPage.CHANGE_VIEW_SHOW.equals(changeId)) { // only for repository view when show
+            doPerspectiveFilter();
+        }
         checkListener();
+    }
+
+    private void doPerspectiveFilter() {
+        final CommonViewer commonViewer2 = getCommonViewer();
+        if (commonViewer2 instanceof RepoViewCommonViewer) {
+            RepositoryNodeFilterHelper.filter(commonViewer2, RepositoryNodeFilterHelper.isActivedFilter(),
+                    PerspectiveFilterHelper.isActivedPerspectiveFilter());
+
+            ((RepoViewCommonViewer) commonViewer2).fireRefreshNodePerspectiveLisenter();
+        }
     }
 
     private void checkListener() {
         // if viewer is completly removed from all views then remove this from perspective listeners.
-        CommonViewer commonViewer = getCommonViewer();
-        if (commonViewer.getControl().isDisposed()) {
+        if (getCommonViewer().getControl().isDisposed()) {
             PlatformUI.getWorkbench().getActiveWorkbenchWindow().removePerspectiveListener(this);
         }// else do nothing
     }
