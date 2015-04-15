@@ -2001,19 +2001,30 @@ public class RepositoryToComponentProperty {
                     }
                     // if can not found noramlly,so maybe the column name changed,use rename map we always found the new
                     // column name here
-                    if (!foundColumn && colRenameMap != null && !colRenameMap.isEmpty()) {
-                        Set<String> newNameSet = colRenameMap.keySet();
-                        for (IMetadataColumn metadataColumn : listColumns) {
-                            if (newNameSet.contains(metadataColumn.getLabel())) {
-                                String oldColLabel = colRenameMap.get((metadataColumn.getLabel()));
-                                if (schemaTarget.getTagName().equals(oldColLabel)) {
-                                    foundColumn = true;
-                                    schemaTarget.setTagName(metadataColumn.getLabel());
-                                    Map<String, Object> map = new HashMap<String, Object>();
-                                    map.put("SCHEMA_COLUMN", metadataColumn.getLabel()); //$NON-NLS-1$
-                                    map.put("QUERY", TalendQuoteUtils.addQuotes(schemaTarget.getRelativeXPathQuery())); //$NON-NLS-1$
-                                    tableInfo.add(map);
+                    if (!foundColumn) {
+                        if (colRenameMap != null && !colRenameMap.isEmpty()) {
+                            Set<String> newNameSet = colRenameMap.keySet();
+                            for (IMetadataColumn metadataColumn : listColumns) {
+                                if (newNameSet.contains(metadataColumn.getLabel())) {
+                                    String oldColLabel = colRenameMap.get((metadataColumn.getLabel()));
+                                    if (schemaTarget.getTagName().equals(oldColLabel)) {
+                                        foundColumn = true;
+                                        schemaTarget.setTagName(metadataColumn.getLabel());
+                                        Map<String, Object> map = new HashMap<String, Object>();
+                                        map.put("SCHEMA_COLUMN", metadataColumn.getLabel()); //$NON-NLS-1$
+                                        map.put("QUERY", TalendQuoteUtils.addQuotes(schemaTarget.getRelativeXPathQuery())); //$NON-NLS-1$
+                                        tableInfo.add(map);
+                                    }
                                 }
+                            }
+                        } else {
+                            if (schemaTarget.getTagName() != null && !schemaTarget.getTagName().equals("")) { //$NON-NLS-1$
+                                tagName = "" + schemaTarget.getTagName().trim().replaceAll(" ", "_"); //$NON-NLS-1$ //$NON-NLS-2$
+                                tagName = MetadataToolHelper.validateColumnName(tagName, j);
+                                Map<String, Object> map = new HashMap<String, Object>();
+                                map.put("SCHEMA_COLUMN", tagName); //$NON-NLS-1$
+                                map.put("QUERY", TalendQuoteUtils.addQuotes(schemaTarget.getRelativeXPathQuery())); //$NON-NLS-1$
+                                tableInfo.add(map);
                             }
                         }
                     }
