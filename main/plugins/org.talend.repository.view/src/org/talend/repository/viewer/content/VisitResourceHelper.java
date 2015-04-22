@@ -46,7 +46,7 @@ public class VisitResourceHelper {
         }
 
         // ignore
-        if (ingoreResource(getSrcDelta())) {
+        if (isIgnoredResource(getSrcDelta())) {
             return false;
         }
 
@@ -57,7 +57,7 @@ public class VisitResourceHelper {
         return false;
     }
 
-    private boolean isTalendProjectFile(IResourceDelta delta) {
+    protected boolean isTalendProjectFile(IResourceDelta delta) {
         IResource resource = delta.getResource();
         if (resource != null && resource instanceof IFile) {
             IPath path = resource.getFullPath();
@@ -68,27 +68,45 @@ public class VisitResourceHelper {
         return false;
     }
 
-    private boolean ingoreResource(IResourceDelta delta) {
+    public boolean isIgnoredResource(IResourceDelta delta) {
         IResource resource = delta.getResource();
-        if (resource != null) {
-            // if not under talend project. ignore
-            try {
-                if (resource.getProject() != null && !resource.getProject().hasNature(TalendNature.ID)) {
-                    return true; // if not talend project, ignore.
+        try {
+            if (resource != null) {
+                if (resource.getProject() == null) {
+                    // must be workspace root, then must check the children resources affected.
+                    for (IResourceDelta childResourceDelta : delta.getAffectedChildren()) {
+                        IResource childResource = childResourceDelta.getResource();
+                        // if not under talend project. ignore
+                        if (childResource.getProject() != null && !childResource.getProject().hasNature(TalendNature.ID)) {
+                            return true; // if not talend project, ignore.
+                        }
+                        // if under svn folder, ignore
+                        if (FilesUtils.isSVNFolder(childResource)) {
+                            return true;
+                        }
+
+                    }
+                } else {
+                    // if not under talend project. ignore
+                    if (!resource.getProject().hasNature(TalendNature.ID)) {
+                        return true; // if not talend project, ignore.
+                    }
+                    // if under svn folder, ignore
+                    if (FilesUtils.isSVNFolder(resource)) {
+                        return true;
+                    }
                 }
-            } catch (CoreException e) {
-                return false;
-            }
-            // if under svn folder, ignore
-            if (FilesUtils.isSVNFolder(resource)) {
+            } else {
                 return true;
             }
+        } catch (CoreException e) {
+            return false;
         }
         return false;
     }
 
     private boolean validResourcePath(IResourceDelta delta, IPath topLevelNodeWorkspaceRelativePath, boolean refMerged) {
-        if (ingoreResource(delta)) {
+        if (isIgnoredResource(delta)) {
             return false;
         }
         IResourceDelta[] affectedChildren = delta.getAffectedChildren();
@@ -143,7 +161,6 @@ public class VisitResourceHelper {
 
     private boolean isMatchedPath(IPath topLevelNodeWorkspaceRelativePath, IPath path) {
         int matchingFirstSegments = path.matchingFirstSegments(topLevelNodeWorkspaceRelativePath);
-
         if (matchingFirstSegments > 0
                 && (path.segmentCount() == matchingFirstSegments || matchingFirstSegments == topLevelNodeWorkspaceRelativePath
                         .segmentCount())) {

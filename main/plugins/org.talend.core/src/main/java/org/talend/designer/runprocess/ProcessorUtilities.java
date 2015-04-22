@@ -26,9 +26,7 @@ import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IFolder;
-import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
-import org.eclipse.core.resources.IncrementalProjectBuilder;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
@@ -38,6 +36,8 @@ import org.talend.commons.CommonsPlugin;
 import org.talend.commons.exception.ExceptionHandler;
 import org.talend.commons.exception.PersistenceException;
 import org.talend.commons.runtime.model.repository.ERepositoryStatus;
+import org.talend.commons.utils.generation.JavaUtils;
+import org.talend.commons.utils.resource.FileExtensions;
 import org.talend.commons.utils.time.TimeMeasure;
 import org.talend.core.CorePlugin;
 import org.talend.core.GlobalServiceRegister;
@@ -57,6 +57,7 @@ import org.talend.core.model.process.IProcess;
 import org.talend.core.model.process.IProcess2;
 import org.talend.core.model.process.JobInfo;
 import org.talend.core.model.process.ReplaceNodesInProcessProvider;
+import org.talend.core.model.properties.Item;
 import org.talend.core.model.properties.ProcessItem;
 import org.talend.core.model.properties.Property;
 import org.talend.core.model.repository.ERepositoryObjectType;
@@ -68,6 +69,7 @@ import org.talend.core.model.runprocess.LastGenerationInfo;
 import org.talend.core.model.utils.JavaResourcesHelper;
 import org.talend.core.model.utils.PerlResourcesHelper;
 import org.talend.core.prefs.ITalendCorePrefConstants;
+import org.talend.core.runtime.process.ITalendProcessJavaProject;
 import org.talend.core.services.ISVNProviderService;
 import org.talend.core.ui.IJobletProviderService;
 import org.talend.designer.core.IDesignerCoreService;
@@ -75,10 +77,6 @@ import org.talend.designer.core.model.utils.emf.talendfile.ContextType;
 import org.talend.designer.core.model.utils.emf.talendfile.ElementParameterType;
 import org.talend.designer.core.model.utils.emf.talendfile.NodeType;
 import org.talend.designer.core.model.utils.emf.talendfile.ProcessType;
-import org.talend.designer.runprocess.IProcessor;
-import org.talend.designer.runprocess.IRunProcessService;
-import org.talend.designer.runprocess.ItemCacheManager;
-import org.talend.designer.runprocess.ProcessorException;
 import org.talend.repository.model.IProxyRepositoryFactory;
 import org.talend.repository.model.IRepositoryService;
 
@@ -153,6 +151,31 @@ public class ProcessorUtilities {
         libraryPath = exportLibraryPath;
         exportConfig = true;
         exportTimeStamp = new Date();
+    }
+
+    public static void setExportConfig(String directory, boolean old) {
+        String libPath = calculateLibraryPathFromDirectory(directory);
+        String routinesJars = ""; //$NON-NLS-1$
+        if (old) { // ../lib/systemRoutines.jar@../lib/userRoutines.jar@.
+            // use character @ as temporary classpath separator, this one will be replaced during the export.
+            routinesJars += libPath + JavaUtils.PATH_SEPARATOR + JavaUtils.SYSTEM_ROUTINE_JAR + TEMP_JAVA_CLASSPATH_SEPARATOR;
+            routinesJars += libPath + JavaUtils.PATH_SEPARATOR + JavaUtils.USER_ROUTINE_JAR + TEMP_JAVA_CLASSPATH_SEPARATOR;
+        } else { // ../lib/routines.jar@.
+            routinesJars += libPath + JavaUtils.PATH_SEPARATOR + JavaUtils.ROUTINE_JAR_NAME + '-'
+                    + JavaUtils.ROUTINE_JAR_DEFAULT_VERSION + FileExtensions.JAR_FILE_SUFFIX + TEMP_JAVA_CLASSPATH_SEPARATOR;
+        }
+        routinesJars += '.';
+        setExportConfig(JavaUtils.JAVA_APP_NAME, routinesJars, libPath);
+    }
+
+    private static String calculateLibraryPathFromDirectory(String directory) {
+        int nb = directory.split(JavaUtils.PATH_SEPARATOR).length - 1;
+        final String parentPath = "../";//$NON-NLS-1$
+        String path = parentPath;
+        for (int i = 0; i < nb; i++) {
+            path = path.concat(parentPath);
+        }
+        return path + JavaUtils.JAVA_LIB_DIRECTORY;
     }
 
     public static Date getExportTimestamp() {
@@ -436,6 +459,17 @@ public class ProcessorUtilities {
         return processor;
     }
 
+    private static void deleteGeneratedResources(ITalendProcessJavaProject javaProject, String projectPackage,
+            IFolder sourceFolder, IProgressMonitor monitor) throws ProcessorException {
+        IFolder sourcesFilesFolder = sourceFolder.getFolder(projectPackage);
+        try {
+            javaProject.cleanFolder(monitor, sourceFolder);
+            sourcesFilesFolder.refreshLocal(IResource.DEPTH_INFINITE, monitor);
+        } catch (CoreException e) {
+            throw new ProcessorException(e);
+        }
+    }
+
     private static void generatePigudfInfor(JobInfo jobInfo, ProcessItem selectedProcessItem, IProcess currentProcess,
             IProcessor processor, Set<ModuleNeeded> neededLibraries) throws ProcessorException {
         // generate pigudf.jar before generate code
@@ -497,6 +531,7 @@ public class ProcessorUtilities {
             IProcess currentProcess, String currentJobName, IProcessor processor) throws ProcessorException {
         if (isMainJob) {
             progressMonitor.subTask(Messages.getString("ProcessorUtilities.finalizeBuild") + currentJobName); //$NON-NLS-1$
+
             Set<String> jarList = new HashSet<String>();
             Set<ModuleNeeded> neededModules = LastGenerationInfo.getInstance().getModulesNeededWithSubjobPerJob(
                     jobInfo.getJobId(), jobInfo.getJobVersion());
@@ -504,16 +539,9 @@ public class ProcessorUtilities {
                 jarList.add(module.getModuleName());
             }
             CorePlugin.getDefault().getRunProcessService().updateLibraries(jarList, currentProcess);
+
             if (codeModified) {
-                try {
-                    IProject project = CorePlugin.getDefault().getRunProcessService().getJavaProject().getProject();
-                    if (!project.isSynchronized(IResource.DEPTH_INFINITE)) {
-                        project.refreshLocal(IResource.DEPTH_INFINITE, progressMonitor);
-                    }
-                    project.build(IncrementalProjectBuilder.AUTO_BUILD, null);
-                } catch (CoreException e) {
-                    throw new ProcessorException(e);
-                }
+                processor.build();
                 processor.syntaxCheck();
             }
             needContextInCurrentGeneration = true;
@@ -1121,7 +1149,10 @@ public class ProcessorUtilities {
         ProcessItem pItem = null;
 
         if (process instanceof IProcess2) {
-            pItem = (ProcessItem) ((IProcess2) process).getProperty().getItem();
+            Item item = ((IProcess2) process).getProperty().getItem();
+            if (item instanceof ProcessItem) {
+                pItem = (ProcessItem) ((IProcess2) process).getProperty().getItem();
+            }
         }
         JobInfo jobInfo;
         if (pItem != null) { // ProcessItem is null for shadow process
@@ -1258,7 +1289,7 @@ public class ProcessorUtilities {
         }
         IContext currentContext = getContext(currentProcess, contextName);
         IProcessor processor = getProcessor(currentProcess, selectedProcessItem.getProperty(), currentContext);
-        String[] cmd = new String[] { processor.getCodePath().removeFirstSegments(1).toString().replace("/", ".") }; //$NON-NLS-1$ //$NON-NLS-2$
+        String[] cmd = new String[] { processor.getMainClass() };
         if (codeOptions != null) {
             for (String string : codeOptions) {
                 if (string != null) {

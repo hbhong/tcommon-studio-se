@@ -12,13 +12,17 @@
 // ============================================================================
 package org.talend.designer.runprocess;
 
+import java.util.Set;
+
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.talend.core.model.process.IContext;
 import org.talend.core.model.process.IProcess;
+import org.talend.core.model.process.JobInfo;
 import org.talend.core.model.properties.Property;
+import org.talend.core.runtime.process.ITalendProcessJavaProject;
 import org.talend.designer.core.ISyntaxCheckableEditor;
 
 /**
@@ -159,6 +163,8 @@ public interface IProcessor {
      */
     public IProject getCodeProject();
 
+    public ITalendProcessJavaProject getTalendJavaProject();
+
     /**
      * Return line number where stands specific node in code generated.
      * 
@@ -235,7 +241,10 @@ public interface IProcessor {
      * Get Current type name for launching.
      * 
      * yzhang Comment method "getTypeName".
+     * 
+     * @deprecated getMainClass instead
      */
+    @Deprecated
     public String getTypeName();
 
     /**
@@ -283,4 +292,17 @@ public interface IProcessor {
     public void setProxyParameters(String[] proxyParameters);
 
     public void syntaxCheck();
+
+    String getMainClass();
+
+    Set<String> getNeededLibraries();
+
+    Set<JobInfo> getBuildChildrenJobs();
+
+    /**
+     * 
+     * build current job or whole project.
+     */
+    void build();
+
 }

@@ -42,6 +42,7 @@ import org.talend.core.model.routines.RoutinesUtil;
 import org.talend.core.model.utils.SQLPatternUtils;
 import org.talend.core.runtime.CoreRuntimePlugin;
 import org.talend.core.ui.IJobletProviderService;
+import org.talend.core.ui.ITestContainerProviderService;
 import org.talend.designer.core.IDesignerCoreService;
 import org.talend.designer.core.model.utils.emf.talendfile.ContextParameterType;
 import org.talend.designer.core.model.utils.emf.talendfile.ContextType;
@@ -655,6 +656,49 @@ public final class ProcessUtils {
             }
         }
         return null;
+    }
+
+    public static boolean isTestContainer(IProcess process) {
+        if (GlobalServiceRegister.getDefault().isServiceRegistered(ITestContainerProviderService.class)) {
+            ITestContainerProviderService testContainerService = (ITestContainerProviderService) GlobalServiceRegister
+                    .getDefault().getService(ITestContainerProviderService.class);
+            if (testContainerService != null) {
+                return testContainerService.isTestContainerProcess(process);
+            }
+        }
+        return false;
+    }
+
+    public static Item getTestContainerBaseItem(Item item) {
+        Item baseItem = null;
+        if (GlobalServiceRegister.getDefault().isServiceRegistered(ITestContainerProviderService.class)) {
+            ITestContainerProviderService testContainerService = (ITestContainerProviderService) GlobalServiceRegister
+                    .getDefault().getService(ITestContainerProviderService.class);
+            if (testContainerService != null) {
+                try {
+                    baseItem = testContainerService.getParentJobItem(item);
+                } catch (PersistenceException e) {
+                    ExceptionHandler.process(e);
+                }
+            }
+        }
+        return baseItem;
+    }
+
+    public static IProcess getTestContainerBaseProcess(IProcess process) {
+        IProcess baseProcess = null;
+        if (GlobalServiceRegister.getDefault().isServiceRegistered(ITestContainerProviderService.class)) {
+            ITestContainerProviderService testContainerService = (ITestContainerProviderService) GlobalServiceRegister
+                    .getDefault().getService(ITestContainerProviderService.class);
+            if (testContainerService != null) {
+                try {
+                    baseProcess = testContainerService.getParentJobProcess(process);
+                } catch (PersistenceException e) {
+                    ExceptionHandler.process(e);
+                }
+            }
+        }
+        return baseProcess;
     }
 
 }
