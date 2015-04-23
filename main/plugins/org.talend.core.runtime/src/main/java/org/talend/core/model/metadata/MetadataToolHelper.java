@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.Vector;
 import java.util.regex.Pattern;
 
+import org.apache.commons.lang.StringUtils;
 import org.eclipse.core.runtime.preferences.IEclipsePreferences;
 import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.emf.common.util.BasicEList;
@@ -74,7 +75,6 @@ import org.talend.designer.core.model.utils.emf.talendfile.TalendFileFactory;
 import org.talend.repository.model.IProxyRepositoryFactory;
 import org.talend.repository.model.IRepositoryService;
 import org.talend.repository.model.RepositoryConstants;
-
 import orgomg.cwm.objectmodel.core.TaggedValue;
 
 /**
@@ -567,6 +567,12 @@ public final class MetadataToolHelper {
 
     public static void copyTable(IMetadataTable source, IMetadataTable target, String targetDbms,
             boolean avoidUsedColumnsFromInput) {
+        String errMsg = checkAllExistColumn(source, target);
+        if (StringUtils.isNotEmpty(errMsg)) {
+            MessageDialog.openError(Display.getCurrent().getActiveShell(),
+                    Messages.getString("DialogErrorForCellEditorListener.Error.MsgDialogTitle"), errMsg); //$NON-NLS-1$
+            return;
+        }
         if (source == null || target == null) {
             return;
         }
@@ -604,6 +610,32 @@ public final class MetadataToolHelper {
         target.setLabel(source.getLabel());
     }
 
+    /**
+     * DOC kongxiaohan Comment method "checkAllExistColumn".
+     * 
+     * @param source
+     * @param target
+     */
+    private static String checkAllExistColumn(IMetadataTable source, IMetadataTable target) {
+        // get output side all the columns
+        List<IMetadataColumn> outputColumnList = target.getListColumns();
+        // get input side all the columns
+        List<IMetadataColumn> inputColumnList = source.getListColumns();
+        for (int i = 0; i < inputColumnList.size(); i++) {
+            for (int j = 0; j < outputColumnList.size(); j++) {
+                if (inputColumnList.get(i).getLabel().equals(outputColumnList.get(j).getLabel())) {
+                    return Messages.getString("MetadataTableEditor.OppsiteColumnNameExists", inputColumnList.get(i).getLabel());
+                } else if (inputColumnList.get(i).getLabel().toLowerCase().equals(outputColumnList.get(j).getLabel())
+                        || inputColumnList.get(i).getLabel().toUpperCase().equals(outputColumnList.get(j).getLabel())) {
+                    return Messages
+                            .getString("MetadataTableEditor.OppsiteColumnNameIsInvalid", inputColumnList.get(i).getLabel()); //$NON-NLS-1$
+                }
+            }
+        }
+        return "";
+
+    }
+
     public static void copyTable(List<IMetadataColumn> sourceColumns, IMetadataTable target, List<IMetadataColumn> targetColumns) {
         if (sourceColumns == null || target == null || targetColumns == null) {
             return;
@@ -639,6 +671,26 @@ public final class MetadataToolHelper {
         targetColumns.addAll(columnsTAdd);
     }
 
+    // public List getBeanListTest() {
+    // org.talend.commons.ui.swt.extended.table.ExtendedTableModel.getBeansList();
+    // }
+    // check moved column is exist in the oppsite side cloumns
+    public static String checkExistColumn(List<IMetadataColumn> sourceColumns, IMetadataTable target) {
+        // get output side all the columns
+        List<IMetadataColumn> outputColumnList = target.getListColumns();
+        for (int i = 0; i < sourceColumns.size(); i++) {
+            for (int j = 0; j < outputColumnList.size(); j++) {
+                if (sourceColumns.get(i).getLabel().equals(outputColumnList.get(j).getLabel())) {
+                    return Messages.getString("MetadataTableEditor.OppsiteColumnNameExists", sourceColumns.get(i).getLabel());
+                } else if (sourceColumns.get(i).getLabel().toLowerCase().equals(outputColumnList.get(j).getLabel())
+                        || sourceColumns.get(i).getLabel().toUpperCase().equals(outputColumnList.get(j).getLabel())) {
+                    return Messages.getString("MetadataTableEditor.OppsiteColumnNameIsInvalid", sourceColumns.get(i).getLabel()); //$NON-NLS-1$
+                }
+            }
+        }
+        return "";
+    }
+
     /**
      * 
      * DOC qli Comment method "copyTable".
@@ -647,6 +699,12 @@ public final class MetadataToolHelper {
      * @return
      */
     public static void copyTable(List<IMetadataColumn> sourceColumns, IMetadataTable target, String targetDbms) {
+        String errMsg = checkExistColumn(sourceColumns, target);
+        if (StringUtils.isNotEmpty(errMsg)) {
+            MessageDialog.openError(Display.getCurrent().getActiveShell(),
+                    Messages.getString("DialogErrorForCellEditorListener.Error.MsgDialogTitle"), errMsg); //$NON-NLS-1$
+            return;
+        }
         if (sourceColumns == null || target == null) {
             return;
         }
